@@ -245,19 +245,17 @@ if 'credit_broker' not in st.session_state:
 # ============================================
 # VÉRIFICATION AU DÉMARRAGE - AUTO-LOGIN
 # ============================================
-cookie_val = cookie_manager.get("logged_in")
-if cookie_val == "true" and not st.session_state.authenticated:
-    saved_email = cookie_manager.get("user_email")
-    if saved_email:
-        try:
-            response = supabase.table('users').select("*").eq('email', saved_email).execute()
-            if response.data:
-                user = response.data[0]
-                st.session_state.authenticated = True
-                st.session_state.user_email = user['email']
-                st.session_state.user_name = user.get('full_name', user['email'].split('@')[0])
-        except:
-            pass
+saved_email = cookie_manager.get("user_email")
+if saved_email and not st.session_state.authenticated:
+    try:
+        response = supabase.table('users').select("*").eq('email', saved_email).execute()
+        if response.data:
+            user = response.data[0]
+            st.session_state.authenticated = True
+            st.session_state.user_email = user['email']
+            st.session_state.user_name = user.get('full_name', user['email'].split('@')[0])
+    except:
+        pass
 
 # ============================================
 # PAGE DE LOGIN
@@ -289,9 +287,8 @@ if not st.session_state.authenticated:
             if submit and email and password:
                 user = authenticate_user(email, password)
                 if user:
+                    # 1. Écrire UN SEUL cookie avec l'email (si remember)
                     if remember:
-                        # 1. Écrire les cookies
-                        cookie_manager.set("logged_in", "true", expires_at=datetime.now() + timedelta(days=30))
                         cookie_manager.set("user_email", user['email'], expires_at=datetime.now() + timedelta(days=30))
 
                     # 2. Forcer session_state
@@ -343,7 +340,6 @@ with col2:
 
 with col3:
     if st.button("🚪 Déconnexion"):
-        cookie_manager.delete("logged_in")
         cookie_manager.delete("user_email")
         st.session_state.authenticated = False
         st.session_state.user_email = None
