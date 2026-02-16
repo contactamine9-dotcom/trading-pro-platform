@@ -5,9 +5,11 @@ from datetime import datetime
 from supabase import create_client, Client
 import bcrypt
 import os
-import extra_streamlit_components as stx
+import time
 
-# Configuration de la page
+# ============================================
+# CONFIGURATION DE LA PAGE (EN PREMIER)
+# ============================================
 st.set_page_config(
     page_title="TradeFlow",
     page_icon="🌊",
@@ -16,9 +18,14 @@ st.set_page_config(
 )
 
 # ============================================
-# COOKIE MANAGER
+# COOKIE MANAGER - INITIALISATION ROBUSTE
 # ============================================
-cookie_manager = stx.CookieManager()
+try:
+    import extra_streamlit_components as stx
+    cookie_manager = stx.CookieManager()
+except:
+    # Fallback si problème d'import
+    cookie_manager = None
 
 # ============================================
 # CSS ULTRA-PRO FINTECH DARK MODE
@@ -35,6 +42,12 @@ st.markdown("""
     .stApp {
         background-color: #0e1117;
         color: #fafafa;
+    }
+
+    /* Logo non-cliquable (pas de zoom) */
+    [data-testid="stImage"] img {
+        pointer-events: none;
+        cursor: default;
     }
 
     /* Inputs et boutons arrondis */
@@ -332,7 +345,7 @@ def calculate_kpis(trades_df):
     }
 
 # ============================================
-# SESSION STATE
+# SESSION STATE INITIALIZATION
 # ============================================
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
@@ -346,20 +359,27 @@ if 'credit_broker' not in st.session_state:
     st.session_state.credit_broker = 500.0
 
 # ============================================
-# AUTO-LOGIN VIA COOKIE
+# AUTO-LOGIN VIA COOKIE (ROBUSTE)
 # ============================================
-if not st.session_state.authenticated:
-    # Récupérer le cookie
-    user_email_cookie = cookie_manager.get(cookie="user_email")
-    user_name_cookie = cookie_manager.get(cookie="user_name")
+if not st.session_state.authenticated and cookie_manager is not None:
+    try:
+        # Récupérer les cookies de manière sécurisée
+        cookies = cookie_manager.get_all()
 
-    if user_email_cookie:
-        # Vérifier que l'utilisateur existe toujours dans la DB
-        user = get_user_by_email(user_email_cookie)
-        if user:
-            st.session_state.authenticated = True
-            st.session_state.user_email = user_email_cookie
-            st.session_state.user_name = user_name_cookie if user_name_cookie else user.get('full_name', user_email_cookie.split('@')[0])
+        if cookies and 'user_email' in cookies:
+            user_email_cookie = cookies.get('user_email')
+            user_name_cookie = cookies.get('user_name', '')
+
+            if user_email_cookie:
+                # Vérifier que l'utilisateur existe toujours
+                user = get_user_by_email(user_email_cookie)
+                if user:
+                    st.session_state.authenticated = True
+                    st.session_state.user_email = user_email_cookie
+                    st.session_state.user_name = user_name_cookie if user_name_cookie else user.get('full_name', user_email_cookie.split('@')[0])
+    except:
+        # Si erreur lors de la lecture des cookies, continuer sans auto-login
+        pass
 
 # ============================================
 # PAGE DE LOGIN
@@ -390,16 +410,31 @@ def show_login_page():
                 if email and password:
                     user = authenticate_user(email, password)
                     if user:
+                        # Authentification réussie
                         st.session_state.authenticated = True
                         st.session_state.user_email = user['email']
                         st.session_state.user_name = user.get('full_name', email.split('@')[0])
 
-                        # Créer le cookie si "Se souvenir de moi" est coché
-                        if remember_me:
-                            cookie_manager.set(cookie="user_email", val=user['email'], expires_at=datetime.now() + pd.Timedelta(days=30))
-                            cookie_manager.set(cookie="user_name", val=st.session_state.user_name, expires_at=datetime.now() + pd.Timedelta(days=30))
+                        # Créer les cookies si demandé
+                        if remember_me and cookie_manager is not None:
+                            try:
+                                cookie_manager.set(
+                                    cookie="user_email",
+                                    val=user['email'],
+                                    expires_at=datetime.now() + pd.Timedelta(days=30)
+                                )
+                                cookie_manager.set(
+                                    cookie="user_name",
+                                    val=st.session_state.user_name,
+                                    expires_at=datetime.now() + pd.Timedelta(days=30)
+                                )
+                                # Petit délai pour laisser les cookies s'écrire
+                                time.sleep(0.5)
+                            except:
+                                pass
 
                         st.success("✅ Connexion réussie!")
+                        time.sleep(0.5)  # Délai avant rerun
                         st.rerun()
                     else:
                         st.error("❌ Email ou mot de passe incorrect")
@@ -439,7 +474,7 @@ def show_main_app():
         st.markdown(f'<p style="color: #8b92a7; margin-top: 20px;">👤 {st.session_state.user_name}</p>', unsafe_allow_html=True)
 
     with col_center:
-        # Logo centré
+        # Logo centré (non-cliquable grâce au CSS)
         try:
             st.image("logo1.png", width=350)
         except:
@@ -448,8 +483,12 @@ def show_main_app():
     with col_right:
         if st.button("🚪 Déconnexion", use_container_width=True):
             # Supprimer les cookies
-            cookie_manager.delete(cookie="user_email")
-            cookie_manager.delete(cookie="user_name")
+            if cookie_manager is not None:
+                try:
+                    cookie_manager.delete(cookie="user_email")
+                    cookie_manager.delete(cookie="user_name")
+                except:
+                    pass
 
             # Réinitialiser la session
             st.session_state.authenticated = False
@@ -463,6 +502,9 @@ def show_main_app():
     # TABS NAVIGATION
     # ============================================
     tab1, tab2, tab3, tab4 = st.tabs(["🏠 DASHBOARD", "⚡ CALCULATEUR", "📖 JOURNAL", "📊 ANALYTICS"])
+
+    # Calcul du capital total (utilisé dans plusieurs tabs)
+    capital_total = st.session_state.capital_reel + st.session_state.credit_broker
 
     # ============================================
     # TAB 1: DASHBOARD
@@ -694,12 +736,12 @@ def show_main_app():
                 """, unsafe_allow_html=True)
 
                 # Alerte risque élevé
-                if risque_pct > 5 or perte_max > capital_reel:
+                if risque_pct > 5 or perte_max > st.session_state.capital_reel:
                     st.markdown("<br>", unsafe_allow_html=True)
                     alert_messages = []
                     if risque_pct > 5:
                         alert_messages.append(f"⚠️ Risque de {risque_pct}% dépasse 5%")
-                    if perte_max > capital_reel:
+                    if perte_max > st.session_state.capital_reel:
                         alert_messages.append(f"⚠️ Perte potentielle entamera le crédit broker")
 
                     st.markdown(f"""
@@ -775,26 +817,31 @@ def show_main_app():
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Formulaire d'ajout de trade
-        with st.expander("➕ Ajouter un Trade", expanded=True):
-            with st.form("trade_form", clear_on_submit=True):
-                col1, col2 = st.columns(2)
+        # ============================================
+        # FORMULAIRE D'AJOUT DE TRADE (SOLUTION ROBUSTE)
+        # ============================================
+        st.markdown("#### ➕ Ajouter un Trade")
 
-                with col1:
-                    trade_date = st.date_input("Date", datetime.now())
-                    trade_pair = st.selectbox("Asset", list(ASSET_CONFIG.keys()))
-                    trade_direction = st.radio("Direction", ["Long", "Short"], horizontal=True)
-                    trade_entry = st.number_input("Entry Price", min_value=0.0, step=0.01, format="%.4f")
+        with st.form("new_trade_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
 
-                with col2:
-                    trade_exit = st.number_input("Exit Price", min_value=0.0, step=0.01, format="%.4f")
-                    trade_lots = st.number_input("Lots", min_value=0.0001, value=0.01, step=0.01, format="%.4f")
-                    trade_result = st.number_input("P&L (€)", step=10.0, help="Résultat net du trade")
+            with col1:
+                trade_date = st.date_input("Date", datetime.now())
+                trade_pair = st.selectbox("Asset", list(ASSET_CONFIG.keys()))
+                trade_direction = st.radio("Direction", ["Long", "Short"], horizontal=True)
+                trade_entry = st.number_input("Entry Price", min_value=0.0, value=0.0, step=0.01, format="%.4f")
 
-                submitted = st.form_submit_button("✅ Ajouter le Trade", use_container_width=True)
+            with col2:
+                trade_exit = st.number_input("Exit Price", min_value=0.0, value=0.0, step=0.01, format="%.4f")
+                trade_lots = st.number_input("Lots", min_value=0.0001, value=0.01, step=0.01, format="%.4f")
+                trade_result = st.number_input("P&L (€)", value=0.0, step=10.0, help="Résultat net du trade")
 
-                if submitted:
-                    if add_trade(
+            submitted = st.form_submit_button("✅ Valider et Ajouter", use_container_width=True)
+
+            if submitted:
+                # Validation
+                if trade_entry > 0 and trade_exit > 0:
+                    success = add_trade(
                         st.session_state.user_email,
                         trade_date.strftime("%Y-%m-%d"),
                         trade_pair,
@@ -803,9 +850,14 @@ def show_main_app():
                         trade_exit,
                         trade_lots,
                         trade_result
-                    ):
+                    )
+
+                    if success:
                         st.success("✅ Trade ajouté avec succès!")
+                        time.sleep(0.5)  # Petit délai pour voir le message
                         st.rerun()
+                else:
+                    st.error("❌ Veuillez remplir Entry Price et Exit Price")
 
     # ============================================
     # TAB 4: ANALYTICS
