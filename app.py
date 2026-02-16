@@ -7,7 +7,7 @@ import bcrypt
 import os
 
 # ============================================
-# CONFIGURATION
+# CONFIGURATION DE LA PAGE (EN PREMIER)
 # ============================================
 st.set_page_config(
     page_title="TradeFlow",
@@ -16,12 +16,134 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS Simple
+# ============================================
+# COOKIE MANAGER - INITIALISATION ROBUSTE
+# ============================================
+try:
+    import extra_streamlit_components as stx
+    cookie_manager = stx.CookieManager()
+except Exception:
+    cookie_manager = None
+
+# ============================================
+# CSS ULTRA-PRO FINTECH DARK MODE
+# ============================================
 st.markdown("""
     <style>
+    /* Cacher tous les éléments Streamlit pour un look application native */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    .stDeployButton {display: none;}
+
+    /* Theme Fintech Dark Mode */
+    .stApp {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
+
+    /* Logo non-cliquable (pas de zoom) */
+    [data-testid="stImage"] img {
+        pointer-events: none !important;
+        cursor: default !important;
+    }
+
+    /* Inputs et boutons arrondis */
+    .stTextInput > div > div > input,
+    .stNumberInput > div > div > input,
+    .stSelectbox > div > div > div,
+    .stDateInput > div > div > input {
+        border-radius: 8px !important;
+        background-color: #1e2130 !important;
+        border: 1px solid #2d3142 !important;
+        color: #fafafa !important;
+    }
+
+    .stButton > button {
+        border-radius: 8px !important;
+        background: linear-gradient(135deg, #00c9ff 0%, #92fe9d 100%) !important;
+        color: #0e1117 !important;
+        font-weight: 700 !important;
+        border: none !important;
+        padding: 12px 24px !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 24px rgba(0, 201, 255, 0.4) !important;
+    }
+
+    /* Métriques stylisées */
+    [data-testid="stMetricValue"] {
+        font-size: 28px !important;
+        font-weight: 700 !important;
+        color: #00c9ff !important;
+    }
+
+    [data-testid="stMetricLabel"] {
+        font-size: 14px !important;
+        color: #8b92a7 !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Tabs modernes */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: transparent;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background-color: #1e2130;
+        border-radius: 8px;
+        padding: 12px 24px;
+        color: #8b92a7;
+        border: 1px solid #2d3142;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #00c9ff 0%, #92fe9d 100%);
+        color: #0e1117 !important;
+        font-weight: 700;
+    }
+
+    /* Dataframe stylé */
+    [data-testid="stDataFrame"] {
+        border-radius: 8px;
+        border: 1px solid #2d3142;
+    }
+
+    /* Forms */
+    [data-testid="stForm"] {
+        background-color: #1a1d29;
+        border-radius: 12px;
+        padding: 24px;
+        border: 1px solid #2d3142;
+    }
+
+    /* Alerts */
+    .stAlert {
+        border-radius: 8px;
+        border-left: 4px solid #00c9ff;
+    }
+
+    /* Login Page Styling */
+    .login-container {
+        max-width: 450px;
+        margin: 0 auto;
+        padding: 40px 20px;
+    }
+
+    .login-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    /* Container boxes */
+    div[data-testid="stHorizontalBlock"] {
+        gap: 16px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -145,7 +267,7 @@ def calculate_kpis(trades_df):
     }
 
 # ============================================
-# SESSION STATE
+# SESSION STATE & COOKIE AUTO-LOGIN
 # ============================================
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
@@ -158,20 +280,46 @@ if 'capital_reel' not in st.session_state:
 if 'credit_broker' not in st.session_state:
     st.session_state.credit_broker = 500.0
 
+# Auto-login via cookie
+if cookie_manager and not st.session_state.authenticated:
+    try:
+        saved_email = cookie_manager.get("tradeflow_user_email")
+        if saved_email:
+            response = supabase.table('users').select("*").eq('email', saved_email).execute()
+            if response.data:
+                user = response.data[0]
+                st.session_state.authenticated = True
+                st.session_state.user_email = user['email']
+                st.session_state.user_name = user.get('full_name', user['email'].split('@')[0])
+    except:
+        pass
+
 # ============================================
 # PAGE DE LOGIN
 # ============================================
 if not st.session_state.authenticated:
-    st.markdown("# 🌊 TradeFlow")
-    st.markdown("### Professional Trading Intelligence")
+    # Header centré avec logo
+    st.markdown('<div class="login-container">', unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        try:
+            st.image("logo1.png", width=300)
+        except:
+            st.markdown("# 🌊 TradeFlow")
+
+        st.markdown("<h3 style='text-align: center; color: #8b92a7;'>Professional Trading Intelligence</h3>", unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("---")
 
     tab_login, tab_signup = st.tabs(["🔐 Login", "📝 Sign Up"])
 
     with tab_login:
         with st.form("login_form"):
-            email = st.text_input("Email")
-            password = st.text_input("Mot de passe", type="password")
+            email = st.text_input("Email", placeholder="votre@email.com")
+            password = st.text_input("Mot de passe", type="password", placeholder="••••••••")
+            remember = st.checkbox("Se souvenir de moi", value=True)
             submit = st.form_submit_button("Se connecter", use_container_width=True)
 
             if submit and email and password:
@@ -180,16 +328,24 @@ if not st.session_state.authenticated:
                     st.session_state.authenticated = True
                     st.session_state.user_email = user['email']
                     st.session_state.user_name = user.get('full_name', email.split('@')[0])
+
+                    # Sauvegarder dans cookie si demandé
+                    if remember and cookie_manager:
+                        try:
+                            cookie_manager.set("tradeflow_user_email", user['email'], expires_at=datetime(2025, 12, 31))
+                        except:
+                            pass
+
                     st.rerun()
                 else:
                     st.error("❌ Email ou mot de passe incorrect")
 
     with tab_signup:
         with st.form("signup_form"):
-            new_email = st.text_input("Email")
-            new_name = st.text_input("Nom complet")
-            new_password = st.text_input("Mot de passe", type="password")
-            new_password_confirm = st.text_input("Confirmer mot de passe", type="password")
+            new_email = st.text_input("Email", placeholder="votre@email.com")
+            new_name = st.text_input("Nom complet", placeholder="Jean Dupont")
+            new_password = st.text_input("Mot de passe", type="password", placeholder="••••••••")
+            new_password_confirm = st.text_input("Confirmer mot de passe", type="password", placeholder="••••••••")
             signup_submit = st.form_submit_button("Créer un compte", use_container_width=True)
 
             if signup_submit and new_email and new_password:
@@ -199,7 +355,7 @@ if not st.session_state.authenticated:
                     st.error("❌ Mot de passe trop court (min 6 caractères)")
                 else:
                     if create_user(new_email, new_password, new_name):
-                        st.success("✅ Compte créé! Connectez-vous.")
+                        st.success("✅ Compte créé! Connectez-vous maintenant.")
 
     st.stop()
 
@@ -207,35 +363,42 @@ if not st.session_state.authenticated:
 # APPLICATION PRINCIPALE
 # ============================================
 
-# Header avec logo
+# Header avec logo centré
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col1:
     st.markdown(f"**👤 {st.session_state.user_name}**")
 
 with col2:
-    # Logo simple centré
     try:
         st.image("logo1.png", width=300)
     except:
-        st.markdown("# 🌊 TradeFlow")
+        st.markdown("<h1 style='text-align: center;'>🌊 TradeFlow</h1>", unsafe_allow_html=True)
 
 with col3:
     if st.button("🚪 Déconnexion"):
         st.session_state.authenticated = False
         st.session_state.user_email = None
         st.session_state.user_name = None
+
+        # Supprimer le cookie
+        if cookie_manager:
+            try:
+                cookie_manager.delete("tradeflow_user_email")
+            except:
+                pass
+
         st.rerun()
 
 st.markdown("---")
 
-# Calcul du capital
+# Calcul du capital total
 capital_total = st.session_state.capital_reel + st.session_state.credit_broker
 
 # ============================================
-# TABS NAVIGATION
+# TABS NAVIGATION (4 TABS)
 # ============================================
-tab1, tab2, tab3 = st.tabs(["🏠 Dashboard", "⚡ Position", "📖 Journal"])
+tab1, tab2, tab3, tab4 = st.tabs(["🏠 Dashboard", "⚡ Position", "📖 Journal", "📊 Analytics"])
 
 # ============================================
 # TAB 1: DASHBOARD
@@ -243,8 +406,9 @@ tab1, tab2, tab3 = st.tabs(["🏠 Dashboard", "⚡ Position", "📖 Journal"])
 with tab1:
     st.markdown("### 💎 Votre Capital")
 
-    col_cap1, col_cap2 = st.columns(2)
-    with col_cap1:
+    # Inputs de capital en haut
+    col_input1, col_input2 = st.columns(2)
+    with col_input1:
         capital_reel = st.number_input(
             "💰 Capital Réel (€)",
             min_value=0.0,
@@ -254,7 +418,7 @@ with tab1:
         )
         st.session_state.capital_reel = capital_reel
 
-    with col_cap2:
+    with col_input2:
         credit_broker = st.number_input(
             "🏦 Crédit Broker (€)",
             min_value=0.0,
@@ -268,6 +432,7 @@ with tab1:
 
     st.markdown("---")
 
+    # 3 métriques sur une ligne
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("💰 Capital Réel", f"{capital_reel:.2f} €")
@@ -284,7 +449,7 @@ with tab1:
     if not trades_df.empty:
         kpis = calculate_kpis(trades_df)
 
-        st.markdown("### 📈 Performance")
+        st.markdown("### 📈 Performance Globale")
 
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -307,14 +472,19 @@ with tab1:
             x=trades_df_sorted['date'],
             y=trades_df_sorted['cumulative'],
             mode='lines+markers',
-            line=dict(color='#00c9ff', width=3)
+            name='Equity',
+            line=dict(color='#00c9ff', width=3),
+            marker=dict(size=6, color='#92fe9d')
         ))
 
         fig.update_layout(
             template="plotly_dark",
             height=400,
             xaxis_title="Date",
-            yaxis_title="Capital (€)"
+            yaxis_title="Capital (€)",
+            hovermode='x unified',
+            plot_bgcolor='#0e1117',
+            paper_bgcolor='#0e1117'
         )
 
         st.plotly_chart(fig, use_container_width=True)
@@ -374,6 +544,8 @@ with tab2:
 
             if risque_pct > 5:
                 st.error("🚨 RISQUE ÉLEVÉ : Plus de 5% du capital !")
+            elif risk_reward >= 2:
+                st.success("✅ Excellent Risk:Reward ratio!")
 
 # ============================================
 # TAB 3: JOURNAL DE TRADING
@@ -381,12 +553,12 @@ with tab2:
 with tab3:
     st.markdown("### 📖 Journal de Trading")
 
-    # Récupérer les trades (à chaque affichage du tab)
+    # Récupérer les trades
     trades_df = get_user_trades(st.session_state.user_email)
 
     # Afficher le tableau
     if not trades_df.empty:
-        st.markdown("#### 📜 Historique")
+        st.markdown("#### 📜 Historique des Trades")
 
         display_df = trades_df[['date', 'pair', 'direction', 'entry_price', 'exit_price', 'lots', 'result']].copy()
         display_df['result'] = display_df['result'].apply(lambda x: f"{'+' if x > 0 else ''}{x:.2f} €")
@@ -442,7 +614,118 @@ with tab3:
                 )
                 if success:
                     st.success("✅ Trade ajouté avec succès !")
-                    # PAS de st.rerun() - l'utilisateur reste sur le Journal
-                    # Le prochain refresh du tab affichera le nouveau trade
+                    # PAS de st.rerun() - garde l'utilisateur sur le Journal
             else:
                 st.error("❌ Veuillez remplir Entry Price et Exit Price")
+
+# ============================================
+# TAB 4: ANALYTICS
+# ============================================
+with tab4:
+    st.markdown("### 📊 Analytics & Statistiques Avancées")
+
+    trades_df = get_user_trades(st.session_state.user_email)
+
+    if not trades_df.empty:
+        kpis = calculate_kpis(trades_df)
+
+        # KPIs détaillés
+        st.markdown("#### 🎯 KPIs Détaillés")
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("🏆 Biggest Win", f"+{kpis['biggest_win']:.2f} €")
+        with col2:
+            st.metric("💥 Biggest Loss", f"{kpis['biggest_loss']:.2f} €")
+        with col3:
+            st.metric("📈 Avg Win", f"+{kpis['avg_win']:.2f} €")
+        with col4:
+            st.metric("📉 Avg Loss", f"{kpis['avg_loss']:.2f} €")
+
+        st.markdown("---")
+
+        # Distribution des trades par asset
+        st.markdown("#### 🌍 Distribution par Asset")
+
+        asset_counts = trades_df['pair'].value_counts()
+
+        fig_assets = go.Figure(data=[go.Pie(
+            labels=asset_counts.index,
+            values=asset_counts.values,
+            hole=0.4,
+            marker=dict(colors=['#00c9ff', '#92fe9d', '#ff6b6b', '#ffd93d', '#a29bfe', '#fd79a8'])
+        )])
+
+        fig_assets.update_layout(
+            template="plotly_dark",
+            height=400,
+            plot_bgcolor='#0e1117',
+            paper_bgcolor='#0e1117'
+        )
+
+        st.plotly_chart(fig_assets, use_container_width=True)
+
+        st.markdown("---")
+
+        # Performance par direction
+        st.markdown("#### 🔄 Performance Long vs Short")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            long_trades = trades_df[trades_df['direction'] == 'Long']
+            if not long_trades.empty:
+                long_pnl = long_trades['result'].sum()
+                long_winrate = (len(long_trades[long_trades['result'] > 0]) / len(long_trades)) * 100
+                st.metric("📈 Long P&L", f"{long_pnl:+.2f} €")
+                st.metric("🎯 Long Winrate", f"{long_winrate:.1f}%")
+            else:
+                st.info("Aucun trade Long")
+
+        with col2:
+            short_trades = trades_df[trades_df['direction'] == 'Short']
+            if not short_trades.empty:
+                short_pnl = short_trades['result'].sum()
+                short_winrate = (len(short_trades[short_trades['result'] > 0]) / len(short_trades)) * 100
+                st.metric("📉 Short P&L", f"{short_pnl:+.2f} €")
+                st.metric("🎯 Short Winrate", f"{short_winrate:.1f}%")
+            else:
+                st.info("Aucun trade Short")
+
+        st.markdown("---")
+
+        # Distribution des gains/pertes
+        st.markdown("#### 📊 Distribution des Résultats")
+
+        fig_dist = go.Figure()
+
+        # Histogram des P&L
+        fig_dist.add_trace(go.Histogram(
+            x=trades_df['result'],
+            nbinsx=20,
+            marker=dict(
+                color=trades_df['result'],
+                colorscale=[[0, '#ff6b6b'], [0.5, '#ffd93d'], [1, '#92fe9d']],
+                line=dict(color='#0e1117', width=1)
+            )
+        ))
+
+        fig_dist.update_layout(
+            template="plotly_dark",
+            height=400,
+            xaxis_title="P&L (€)",
+            yaxis_title="Nombre de trades",
+            plot_bgcolor='#0e1117',
+            paper_bgcolor='#0e1117'
+        )
+
+        st.plotly_chart(fig_dist, use_container_width=True)
+
+    else:
+        st.info("📭 Aucune donnée pour l'analyse. Ajoutez des trades dans le Journal!")
+
+# ============================================
+# FOOTER
+# ============================================
+st.markdown("---")
+st.markdown("<p style='text-align: center; color: #8b92a7; font-size: 12px;'>🌊 TradeFlow | Professional Trading Intelligence | Powered by Supabase</p>", unsafe_allow_html=True)
