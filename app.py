@@ -6,8 +6,8 @@ from supabase import create_client, Client
 
 # Configuration de la page
 st.set_page_config(
-    page_title="Trading Pro Platform",
-    page_icon="📊",
+    page_title="TradeFlow",
+    page_icon="🌊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -15,6 +15,11 @@ st.set_page_config(
 # Style CSS professionnel avec effet clignotant
 st.markdown("""
     <style>
+    /* Cacher les éléments Streamlit pour un look application native */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
     /* Theme sombre professionnel */
     .stApp {
         background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
@@ -441,7 +446,16 @@ def calculate_kpis(trades_df):
 # ============================================
 # SIDEBAR - PARAMÈTRES DU COMPTE
 # ============================================
-st.sidebar.markdown('<h1 style="color: #00ff88; text-align: center;">⚙️ ACCOUNT</h1>', unsafe_allow_html=True)
+# Logo et branding
+try:
+    st.sidebar.image("logo.png", use_column_width=True)
+except:
+    st.sidebar.markdown('<h1 style="color: #00ff88; text-align: center;">🌊 TradeFlow</h1>', unsafe_allow_html=True)
+
+st.sidebar.markdown('<p style="text-align: center; color: #8b92a7; font-size: 13px; margin-top: -10px;">Professional Trading Intelligence</p>', unsafe_allow_html=True)
+st.sidebar.markdown("---")
+
+st.sidebar.markdown('<h2 style="color: #00ff88; text-align: center; font-size: 18px;">⚙️ ACCOUNT</h2>', unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
 # Capital
@@ -510,8 +524,33 @@ st.sidebar.markdown("""
 # ============================================
 # HEADER PRINCIPAL
 # ============================================
-st.markdown('<h1 style="text-align: center; color: #00ff88; font-size: 48px; font-weight: 900; margin-bottom: 0;">📊 TRADING PRO PLATFORM</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align: center; color: #8b92a7; font-size: 16px; margin-top: 10px;">Professional Risk Management & Analytics | Cloud-Powered by Supabase</p>', unsafe_allow_html=True)
+st.markdown('<h1 style="text-align: center; color: #00ff88; font-size: 48px; font-weight: 900; margin-bottom: 0;">🌊 TRADEFLOW</h1>', unsafe_allow_html=True)
+st.markdown('<p style="text-align: center; color: #8b92a7; font-size: 16px; margin-top: 10px;">Professional Trading Intelligence | Risk Management & Analytics</p>', unsafe_allow_html=True)
+
+# Dashboard metrics (3 colonnes pour les infos clés)
+dash_col1, dash_col2, dash_col3 = st.columns(3)
+
+with dash_col1:
+    st.metric(
+        label="💰 Capital Réel",
+        value=f"{capital_reel:.2f} €",
+        delta=None
+    )
+
+with dash_col2:
+    st.metric(
+        label="🏦 Crédit Broker",
+        value=f"{credit_broker:.2f} €",
+        delta=None
+    )
+
+with dash_col3:
+    st.metric(
+        label="💎 Total Equity",
+        value=f"{capital_total:.2f} €",
+        delta=f"{risque_pct}% risk/trade"
+    )
+
 st.markdown("---")
 
 # ============================================
@@ -703,30 +742,66 @@ with tab1:
 with tab2:
     st.markdown('<div class="section-header">📔 Trade Journal</div>', unsafe_allow_html=True)
 
-    col_form, col_history = st.columns([1, 2], gap="large")
+    # Récupérer les trades d'abord
+    trades_df = get_all_trades()
 
-    with col_form:
-        st.markdown("### ➕ New Trade Entry")
+    # TABLEAU EN PREMIER
+    if not trades_df.empty:
+        # Préparation du dataframe pour l'affichage
+        display_df = trades_df[['date', 'pair', 'direction', 'entry_price', 'exit_price', 'lots', 'result']].copy()
+        display_df['result'] = display_df['result'].apply(lambda x: f"{'+' if x > 0 else ''}{x:.2f} €")
+        display_df.columns = ['Date', 'Asset', 'Direction', 'Entry', 'Exit', 'Lots', 'P&L']
 
-        with st.form("trade_form", clear_on_submit=True):
-            trade_date = st.date_input("Date", datetime.now())
-            trade_pair = st.selectbox("Asset", list(ASSET_CONFIG.keys()))
-            trade_direction = st.radio("Direction", ["Long", "Short"], horizontal=True)
+        # Affichage du tableau interactif
+        st.dataframe(
+            display_df,
+            use_container_width=True,
+            height=400,
+            hide_index=True
+        )
 
-            col1, col2 = st.columns(2)
-            with col1:
-                trade_entry = st.number_input("Entry Price", min_value=0.0, value=0.0, step=0.01)
-            with col2:
-                trade_exit = st.number_input("Exit Price", min_value=0.0, value=0.0, step=0.01)
+        # Actions
+        col_action1, col_action2 = st.columns(2)
+        with col_action1:
+            if st.button("🗑️ Clear All Trades", type="secondary", use_container_width=True):
+                if delete_all_trades():
+                    st.success("Tous les trades ont été supprimés de Supabase")
+                    st.rerun()
 
-            trade_lots = st.number_input("Lots", min_value=0.0001, value=0.01, step=0.01, format="%.4f")
-
-            trade_result = st.number_input(
-                "P&L (€)",
-                value=0.0,
-                step=10.0,
-                help="Résultat net du trade"
+        with col_action2:
+            csv = display_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Export CSV",
+                data=csv,
+                file_name=f"trades_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                use_container_width=True
             )
+    else:
+        st.info("📭 Aucun trade enregistré. Ajoutez votre premier trade ci-dessous!")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # FORMULAIRE DANS UN EXPANDER FERMÉ
+    with st.expander("➕ Nouveau Trade", expanded=False):
+        with st.form("trade_form", clear_on_submit=True):
+            col_form1, col_form2 = st.columns(2)
+
+            with col_form1:
+                trade_date = st.date_input("Date", datetime.now())
+                trade_pair = st.selectbox("Asset", list(ASSET_CONFIG.keys()))
+                trade_direction = st.radio("Direction", ["Long", "Short"], horizontal=True)
+                trade_entry = st.number_input("Entry Price", min_value=0.0, value=0.0, step=0.01)
+
+            with col_form2:
+                trade_lots = st.number_input("Lots", min_value=0.0001, value=0.01, step=0.01, format="%.4f")
+                trade_exit = st.number_input("Exit Price", min_value=0.0, value=0.0, step=0.01)
+                trade_result = st.number_input(
+                    "P&L (€)",
+                    value=0.0,
+                    step=10.0,
+                    help="Résultat net du trade"
+                )
 
             submitted = st.form_submit_button("✅ Add Trade", use_container_width=True)
 
@@ -743,45 +818,6 @@ with tab2:
                 if success:
                     st.success("✅ Trade ajouté avec succès dans Supabase!")
                     st.rerun()
-
-    with col_history:
-        st.markdown("### 📜 Trade History")
-
-        trades_df = get_all_trades()
-
-        if not trades_df.empty:
-            # Préparation du dataframe pour l'affichage
-            display_df = trades_df[['date', 'pair', 'direction', 'entry_price', 'exit_price', 'lots', 'result']].copy()
-            display_df['result'] = display_df['result'].apply(lambda x: f"{'+' if x > 0 else ''}{x:.2f} €")
-            display_df.columns = ['Date', 'Asset', 'Direction', 'Entry', 'Exit', 'Lots', 'P&L']
-
-            # Affichage du tableau interactif
-            st.dataframe(
-                display_df,
-                use_container_width=True,
-                height=500,
-                hide_index=True
-            )
-
-            # Actions
-            col_action1, col_action2 = st.columns(2)
-            with col_action1:
-                if st.button("🗑️ Clear All Trades", type="secondary", use_container_width=True):
-                    if delete_all_trades():
-                        st.success("Tous les trades ont été supprimés de Supabase")
-                        st.rerun()
-
-            with col_action2:
-                csv = display_df.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Export CSV",
-                    data=csv,
-                    file_name=f"trades_{datetime.now().strftime('%Y%m%d')}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-        else:
-            st.info("📭 Aucun trade enregistré. Ajoutez votre premier trade!")
 
 # ============================================
 # TAB 3 : ANALYTICS
@@ -935,7 +971,7 @@ with tab3:
 st.markdown("---")
 st.markdown(
     '<div style="text-align: center; color: #8b92a7; padding: 20px; font-size: 14px;">'
-    '💹 Trading Pro Platform | Professional Risk Management System | Powered by Supabase Cloud Database'
+    '🌊 TradeFlow | Professional Trading Intelligence | Powered by Supabase'
     '</div>',
     unsafe_allow_html=True
 )
