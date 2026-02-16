@@ -11,7 +11,7 @@ st.set_page_config(
     page_title="TradeFlow",
     page_icon="🌊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # ============================================
@@ -29,16 +29,6 @@ st.markdown("""
     .stApp {
         background-color: #0e1117;
         color: #fafafa;
-    }
-
-    /* Sidebar stylisée */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1a1d29 0%, #12141d 100%);
-        border-right: 1px solid #2d3142;
-    }
-
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        color: #e0e0e0;
     }
 
     /* Inputs et boutons arrondis */
@@ -65,15 +55,6 @@ st.markdown("""
     .stButton > button:hover {
         transform: translateY(-2px) !important;
         box-shadow: 0 8px 24px rgba(0, 201, 255, 0.4) !important;
-    }
-
-    /* Cartes/Containers modernes */
-    [data-testid="stVerticalBlock"] > [data-testid="stContainer"] {
-        background-color: #1a1d29;
-        border-radius: 12px;
-        padding: 20px;
-        border: 1px solid #2d3142;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     }
 
     /* Métriques stylisées */
@@ -151,25 +132,6 @@ st.markdown("""
         margin-bottom: 30px;
     }
 
-    /* Card pour sections */
-    .card {
-        background: linear-gradient(135deg, #1a1d29 0%, #12141d 100%);
-        padding: 24px;
-        border-radius: 12px;
-        border: 1px solid #2d3142;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-        margin: 16px 0;
-    }
-
-    .card-title {
-        color: #00c9ff;
-        font-size: 20px;
-        font-weight: 700;
-        margin-bottom: 16px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
     /* Danger alert animation */
     @keyframes pulse-red {
         0%, 100% {
@@ -191,53 +153,44 @@ st.markdown("""
         margin: 20px 0;
         text-align: center;
     }
+
+    /* Card style */
+    .metric-card {
+        background: linear-gradient(135deg, #1a1d29 0%, #12141d 100%);
+        padding: 24px;
+        border-radius: 12px;
+        border: 1px solid #2d3142;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        text-align: center;
+        margin: 10px 0;
+    }
+
+    .metric-label {
+        color: #8b92a7;
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 10px;
+    }
+
+    .metric-value {
+        color: #00c9ff;
+        font-size: 32px;
+        font-weight: 700;
+        margin: 10px 0;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# Configuration des actifs avec valeurs de point prédéfinies
+# Configuration des actifs
 ASSET_CONFIG = {
-    "XAUUSD": {
-        "name": "Gold",
-        "point_value": 100.0,
-        "currency": "$",
-        "contract_size": "100 oz",
-        "description": "1 point = 100$ par lot standard"
-    },
-    "DJ30": {
-        "name": "Dow Jones 30",
-        "point_value": 5.0,
-        "currency": "$",
-        "contract_size": "1 point = 5$",
-        "description": "Valeur typique: 1-5$ par point"
-    },
-    "DAX40": {
-        "name": "DAX 40",
-        "point_value": 25.0,
-        "currency": "€",
-        "contract_size": "1 point = 25€",
-        "description": "Valeur typique: 1-25€ par point"
-    },
-    "NAS100": {
-        "name": "Nasdaq 100",
-        "point_value": 20.0,
-        "currency": "$",
-        "contract_size": "1 point = 20$",
-        "description": "Valeur typique: 1-20$ par point"
-    },
-    "BTCUSD": {
-        "name": "Bitcoin",
-        "point_value": 1.0,
-        "currency": "$",
-        "contract_size": "1 coin",
-        "description": "1$ move = 1$ PnL par coin"
-    },
-    "ETHUSD": {
-        "name": "Ethereum",
-        "point_value": 1.0,
-        "currency": "$",
-        "contract_size": "1 coin",
-        "description": "1$ move = 1$ PnL par coin"
-    }
+    "XAUUSD": {"name": "Gold", "point_value": 100.0, "currency": "$", "description": "1 point = 100$ par lot standard"},
+    "DJ30": {"name": "Dow Jones 30", "point_value": 5.0, "currency": "$", "description": "1 point = 5$ par lot"},
+    "DAX40": {"name": "DAX 40", "point_value": 25.0, "currency": "€", "description": "1 point = 25€ par lot"},
+    "NAS100": {"name": "Nasdaq 100", "point_value": 20.0, "currency": "$", "description": "1 point = 20$ par lot"},
+    "BTCUSD": {"name": "Bitcoin", "point_value": 1.0, "currency": "$", "description": "1$ move = 1$ PnL"},
+    "ETHUSD": {"name": "Ethereum", "point_value": 1.0, "currency": "$", "description": "1$ move = 1$ PnL"}
 }
 
 # ============================================
@@ -259,7 +212,6 @@ def init_supabase():
 
         supabase: Client = create_client(supabase_url, supabase_key)
         return supabase
-
     except Exception as e:
         st.error(f"❌ Erreur de connexion à Supabase: {str(e)}")
         st.stop()
@@ -270,46 +222,35 @@ supabase = init_supabase()
 # FONCTIONS D'AUTHENTIFICATION
 # ============================================
 def hash_password(password: str) -> str:
-    """Hash un mot de passe avec bcrypt"""
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def verify_password(password: str, hashed: str) -> bool:
-    """Vérifie un mot de passe contre son hash"""
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 def create_user(email: str, password: str, full_name: str = None):
-    """Crée un nouvel utilisateur"""
     try:
         password_hash = hash_password(password)
-        data = {
-            "email": email,
-            "password_hash": password_hash,
-            "full_name": full_name
-        }
+        data = {"email": email, "password_hash": password_hash, "full_name": full_name}
         supabase.table('users').insert(data).execute()
         return True
     except Exception as e:
-        st.error(f"❌ Erreur lors de la création du compte: {str(e)}")
+        st.error(f"❌ Erreur: {str(e)}")
         return False
 
 def authenticate_user(email: str, password: str):
-    """Authentifie un utilisateur"""
     try:
         response = supabase.table('users').select("*").eq('email', email).execute()
-
         if not response.data:
             return None
-
         user = response.data[0]
         if verify_password(password, user['password_hash']):
             return user
         return None
     except Exception as e:
-        st.error(f"❌ Erreur lors de l'authentification: {str(e)}")
+        st.error(f"❌ Erreur: {str(e)}")
         return None
 
 def check_table_exists(table_name: str):
-    """Vérifie si une table existe"""
     try:
         supabase.table(table_name).select("id").limit(1).execute()
         return True
@@ -317,21 +258,14 @@ def check_table_exists(table_name: str):
         return False
 
 # ============================================
-# FONCTIONS TRADES (avec user_email)
+# FONCTIONS TRADES
 # ============================================
 def add_trade(user_email, date, pair, direction, entry_price, exit_price, lots, result):
-    """Ajoute un trade dans Supabase"""
     try:
         data = {
-            "user_email": user_email,
-            "date": date,
-            "pair": pair,
-            "direction": direction,
-            "entry_price": entry_price,
-            "exit_price": exit_price,
-            "lots": lots,
-            "result": result,
-            "timestamp": datetime.now().isoformat()
+            "user_email": user_email, "date": date, "pair": pair, "direction": direction,
+            "entry_price": entry_price, "exit_price": exit_price, "lots": lots,
+            "result": result, "timestamp": datetime.now().isoformat()
         }
         supabase.table('trades').insert(data).execute()
         return True
@@ -340,7 +274,6 @@ def add_trade(user_email, date, pair, direction, entry_price, exit_price, lots, 
         return False
 
 def get_user_trades(user_email):
-    """Récupère tous les trades d'un utilisateur"""
     try:
         response = supabase.table('trades').select("*").eq('user_email', user_email).order('date', desc=True).execute()
         if response.data:
@@ -351,7 +284,6 @@ def get_user_trades(user_email):
         return pd.DataFrame()
 
 def delete_user_trades(user_email):
-    """Supprime tous les trades d'un utilisateur"""
     try:
         response = supabase.table('trades').select("id").eq('user_email', user_email).execute()
         if response.data:
@@ -363,25 +295,19 @@ def delete_user_trades(user_email):
         return False
 
 def calculate_kpis(trades_df):
-    """Calcule les KPIs"""
     if trades_df.empty:
-        return {
-            'winrate': 0, 'profit_factor': 0, 'biggest_win': 0,
-            'biggest_loss': 0, 'total_trades': 0, 'avg_win': 0, 'avg_loss': 0
-        }
+        return {'winrate': 0, 'profit_factor': 0, 'biggest_win': 0, 'biggest_loss': 0,
+                'total_trades': 0, 'avg_win': 0, 'avg_loss': 0}
 
     winning_trades = trades_df[trades_df['result'] > 0]
     losing_trades = trades_df[trades_df['result'] < 0]
-
     total_wins = winning_trades['result'].sum() if not winning_trades.empty else 0
     total_losses = abs(losing_trades['result'].sum()) if not losing_trades.empty else 0
-
     winrate = (len(winning_trades) / len(trades_df)) * 100 if len(trades_df) > 0 else 0
     profit_factor = total_wins / total_losses if total_losses > 0 else (total_wins if total_wins > 0 else 0)
 
     return {
-        'winrate': winrate,
-        'profit_factor': profit_factor,
+        'winrate': winrate, 'profit_factor': profit_factor,
         'biggest_win': trades_df['result'].max() if not trades_df.empty else 0,
         'biggest_loss': trades_df['result'].min() if not trades_df.empty else 0,
         'total_trades': len(trades_df),
@@ -390,7 +316,7 @@ def calculate_kpis(trades_df):
     }
 
 # ============================================
-# SESSION STATE INITIALIZATION
+# SESSION STATE
 # ============================================
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
@@ -398,12 +324,15 @@ if 'user_email' not in st.session_state:
     st.session_state.user_email = None
 if 'user_name' not in st.session_state:
     st.session_state.user_name = None
+if 'capital_reel' not in st.session_state:
+    st.session_state.capital_reel = 733.18
+if 'credit_broker' not in st.session_state:
+    st.session_state.credit_broker = 500.0
 
 # ============================================
 # PAGE DE LOGIN
 # ============================================
 def show_login_page():
-    # Vérifier si la table users existe
     if not check_table_exists('users'):
         st.error("""
         ⚠️ **Table 'users' non trouvée**
@@ -413,7 +342,6 @@ def show_login_page():
         st.stop()
 
     st.markdown('<div class="login-container">', unsafe_allow_html=True)
-
     st.markdown('<div class="login-header">🌊 TradeFlow</div>', unsafe_allow_html=True)
     st.markdown('<div class="login-subtitle">Professional Trading Intelligence</div>', unsafe_allow_html=True)
 
@@ -455,95 +383,78 @@ def show_login_page():
                         st.error("❌ Le mot de passe doit contenir au moins 6 caractères")
                     else:
                         if create_user(new_email, new_password, new_name):
-                            st.success("✅ Compte créé avec succès! Connectez-vous maintenant.")
+                            st.success("✅ Compte créé! Connectez-vous maintenant.")
                 else:
                     st.warning("⚠️ Veuillez remplir tous les champs")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================
-# MAIN APP (Protected)
+# MAIN APP
 # ============================================
 def show_main_app():
-    # Sidebar
-    st.sidebar.markdown("---")
+    # Header avec logo et déconnexion
+    col_logo, col_title, col_logout = st.columns([1, 3, 1])
 
-    # Logo
-    try:
-        st.sidebar.image("logo1.png", use_column_width=True)
-    except:
-        st.sidebar.markdown('<h1 style="color: #00c9ff; text-align: center;">🌊 TradeFlow</h1>', unsafe_allow_html=True)
+    with col_logo:
+        try:
+            st.image("logo1.png", width=150)
+        except:
+            st.markdown("## 🌊 TradeFlow")
 
-    st.sidebar.markdown('<p style="text-align: center; color: #8b92a7; font-size: 13px;">Professional Trading Intelligence</p>', unsafe_allow_html=True)
-    st.sidebar.markdown("---")
+    with col_title:
+        st.markdown(f'<h1 style="color: #00c9ff; text-align: center;">TradeFlow Premium</h1>', unsafe_allow_html=True)
+        st.markdown(f'<p style="text-align: center; color: #8b92a7;">👤 {st.session_state.user_name} | {st.session_state.user_email}</p>', unsafe_allow_html=True)
 
-    # User info
-    st.sidebar.markdown(f"👤 **{st.session_state.user_name}**")
-    st.sidebar.markdown(f"<small style='color: #8b92a7;'>{st.session_state.user_email}</small>", unsafe_allow_html=True)
-    st.sidebar.markdown("---")
+    with col_logout:
+        if st.button("🚪 Déconnexion", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.user_email = None
+            st.session_state.user_name = None
+            st.rerun()
 
-    # Navigation
-    st.sidebar.markdown("### 📍 Navigation")
-    page = st.sidebar.radio(
-        "Menu",
-        ["🏠 Dashboard", "🧮 Calculator", "📔 Journal", "📊 Analytics"],
-        label_visibility="collapsed"
-    )
-
-    st.sidebar.markdown("---")
-
-    # Account settings
-    st.sidebar.markdown("### ⚙️ Account Settings")
-
-    capital_reel = st.sidebar.number_input(
-        "💰 Capital Réel (€)",
-        min_value=0.0,
-        value=733.18,
-        step=50.0
-    )
-
-    credit_broker = st.sidebar.number_input(
-        "🏦 Crédit Broker (€)",
-        min_value=0.0,
-        value=500.0,
-        step=50.0
-    )
-
-    capital_total = capital_reel + credit_broker
-
-    risque_pct = st.sidebar.slider(
-        "🎯 Risque par Trade (%)",
-        min_value=0.5,
-        max_value=10.0,
-        value=2.0,
-        step=0.5
-    )
-
-    montant_risque_total = capital_total * (risque_pct / 100)
-
-    st.sidebar.markdown("---")
-
-    # Logout button
-    if st.sidebar.button("🚪 Déconnexion", use_container_width=True):
-        st.session_state.authenticated = False
-        st.session_state.user_email = None
-        st.session_state.user_name = None
-        st.rerun()
+    st.markdown("---")
 
     # ============================================
-    # MAIN CONTENT AREA
+    # TABS NAVIGATION
     # ============================================
-
-    # Header
-    st.markdown('<h1 style="text-align: center; color: #00c9ff; font-size: 48px; font-weight: 900;">🌊 TRADEFLOW</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; color: #8b92a7; font-size: 16px; margin-bottom: 30px;">Professional Trading Intelligence</p>', unsafe_allow_html=True)
+    tab1, tab2, tab3, tab4 = st.tabs(["🏠 DASHBOARD", "⚡ CALCULATEUR", "📖 JOURNAL", "📊 ANALYTICS"])
 
     # ============================================
-    # DASHBOARD PAGE
+    # TAB 1: DASHBOARD
     # ============================================
-    if page == "🏠 Dashboard":
-        # KPIs en haut
-        col1, col2, col3, col4 = st.columns(4)
+    with tab1:
+        st.markdown("### 💎 Votre Capital")
+
+        # Inputs modifiables pour Capital et Crédit
+        col_cap1, col_cap2 = st.columns(2)
+
+        with col_cap1:
+            capital_reel = st.number_input(
+                "💰 Capital Réel (€)",
+                min_value=0.0,
+                value=st.session_state.capital_reel,
+                step=50.0,
+                key="capital_input"
+            )
+            st.session_state.capital_reel = capital_reel
+
+        with col_cap2:
+            credit_broker = st.number_input(
+                "🏦 Crédit Broker (€)",
+                min_value=0.0,
+                value=st.session_state.credit_broker,
+                step=50.0,
+                key="credit_input"
+            )
+            st.session_state.credit_broker = credit_broker
+
+        capital_total = capital_reel + credit_broker
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Métriques principales
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             st.metric("💰 Capital Réel", f"{capital_reel:.2f} €")
@@ -554,206 +465,274 @@ def show_main_app():
         with col3:
             st.metric("💎 Total Equity", f"{capital_total:.2f} €")
 
-        with col4:
-            st.metric("🎯 Risque/Trade", f"{montant_risque_total:.2f} €", delta=f"{risque_pct}%")
-
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Quick stats
+        # Performance Overview
         trades_df = get_user_trades(st.session_state.user_email)
 
         if not trades_df.empty:
             kpis = calculate_kpis(trades_df)
 
-            with st.container(border=True):
-                st.markdown("### 📈 Performance Overview")
+            st.markdown("### 📈 Performance Overview")
 
-                kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+            kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
-                with kpi_col1:
-                    st.metric("🎯 Winrate", f"{kpis['winrate']:.1f}%")
+            with kpi_col1:
+                st.metric("🎯 Winrate", f"{kpis['winrate']:.1f}%")
 
-                with kpi_col2:
-                    st.metric("💰 Profit Factor", f"{kpis['profit_factor']:.2f}")
+            with kpi_col2:
+                st.metric("💰 Profit Factor", f"{kpis['profit_factor']:.2f}")
 
-                with kpi_col3:
-                    total_pnl = trades_df['result'].sum()
-                    st.metric("💵 Total P&L", f"{total_pnl:+.2f} €")
+            with kpi_col3:
+                total_pnl = trades_df['result'].sum()
+                st.metric("💵 Total P&L", f"{total_pnl:+.2f} €")
 
-                with kpi_col4:
-                    st.metric("📊 Total Trades", f"{kpis['total_trades']}")
+            with kpi_col4:
+                st.metric("📊 Total Trades", f"{kpis['total_trades']}")
 
-            # Equity curve
             st.markdown("<br>", unsafe_allow_html=True)
 
-            with st.container(border=True):
-                st.markdown("### 📈 Equity Curve")
+            # Quick equity curve
+            st.markdown("### 📈 Equity Curve")
+            trades_df_sorted = trades_df.sort_values('date')
+            trades_df_sorted['cumulative'] = trades_df_sorted['result'].cumsum() + capital_reel
 
-                trades_df_sorted = trades_df.sort_values('date')
-                trades_df_sorted['cumulative'] = trades_df_sorted['result'].cumsum() + capital_reel
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=trades_df_sorted['date'],
+                y=trades_df_sorted['cumulative'],
+                mode='lines+markers',
+                name='Equity',
+                line=dict(color='#00c9ff', width=3),
+                fill='tozeroy',
+                fillcolor='rgba(0, 201, 255, 0.1)'
+            ))
 
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=trades_df_sorted['date'],
-                    y=trades_df_sorted['cumulative'],
-                    mode='lines+markers',
-                    name='Equity',
-                    line=dict(color='#00c9ff', width=3),
-                    fill='tozeroy',
-                    fillcolor='rgba(0, 201, 255, 0.1)'
-                ))
+            fig.add_hline(y=capital_reel, line_dash="dash", line_color="white", opacity=0.3)
 
-                fig.add_hline(y=capital_reel, line_dash="dash", line_color="white", opacity=0.3)
+            fig.update_layout(
+                template="plotly_dark",
+                plot_bgcolor='#0e1117',
+                paper_bgcolor='#0e1117',
+                height=400,
+                xaxis_title="Date",
+                yaxis_title="Capital (€)",
+                hovermode='x unified'
+            )
 
-                fig.update_layout(
-                    template="plotly_dark",
-                    plot_bgcolor='#0e1117',
-                    paper_bgcolor='#0e1117',
-                    height=400,
-                    xaxis_title="Date",
-                    yaxis_title="Capital (€)",
-                    hovermode='x unified'
-                )
-
-                st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("📭 Aucune donnée de trading. Commencez par ajouter des trades dans le Journal!")
+            st.info("📭 Aucune donnée de trading. Ajoutez des trades dans le Journal!")
 
     # ============================================
-    # CALCULATOR PAGE
+    # TAB 2: CALCULATEUR
     # ============================================
-    elif page == "🧮 Calculator":
-        st.markdown("### ⚡ Position Size Calculator")
+    with tab2:
+        st.markdown("### ⚡ Calculateur de Position Size")
 
         col_left, col_right = st.columns([1, 1], gap="large")
 
         with col_left:
-            with st.container(border=True):
-                st.markdown("#### 🎲 Trade Parameters")
+            st.markdown("#### 🎲 Paramètres du Trade")
 
-                selected_pair = st.selectbox(
-                    "Asset",
-                    options=list(ASSET_CONFIG.keys()),
-                    format_func=lambda x: f"{x} - {ASSET_CONFIG[x]['name']}"
-                )
+            # Sélection de l'actif
+            selected_pair = st.selectbox(
+                "Asset",
+                options=list(ASSET_CONFIG.keys()),
+                format_func=lambda x: f"{x} - {ASSET_CONFIG[x]['name']}"
+            )
 
-                asset_info = ASSET_CONFIG[selected_pair]
-                st.info(f"📌 {asset_info['description']}")
+            asset_info = ASSET_CONFIG[selected_pair]
+            st.info(f"📌 {asset_info['description']}")
 
-                entry_price = st.number_input(
-                    "Entry Price",
-                    min_value=0.0,
-                    value=2000.0 if "XAU" in selected_pair else 1.1000,
-                    step=0.01,
-                    format="%.4f"
-                )
+            # Prix d'entrée
+            entry_price = st.number_input(
+                "Entry Price",
+                min_value=0.0,
+                value=2000.0 if "XAU" in selected_pair else 1.1000,
+                step=0.01,
+                format="%.4f"
+            )
 
-                stop_loss = st.number_input(
-                    "Stop Loss",
-                    min_value=0.0,
-                    value=1950.0 if "XAU" in selected_pair else 1.0950,
-                    step=0.01,
-                    format="%.4f"
-                )
+            # Stop Loss
+            stop_loss = st.number_input(
+                "Stop Loss",
+                min_value=0.0,
+                value=1950.0 if "XAU" in selected_pair else 1.0950,
+                step=0.01,
+                format="%.4f"
+            )
 
-                take_profit = st.number_input(
-                    "Take Profit",
-                    min_value=0.0,
-                    value=2100.0 if "XAU" in selected_pair else 1.1100,
-                    step=0.01,
-                    format="%.4f"
-                )
+            # Take Profit
+            take_profit = st.number_input(
+                "Take Profit",
+                min_value=0.0,
+                value=2100.0 if "XAU" in selected_pair else 1.1100,
+                step=0.01,
+                format="%.4f"
+            )
 
-                point_value = st.number_input(
-                    f"Point Value ({asset_info['currency']})",
-                    min_value=0.01,
-                    value=asset_info['point_value'],
-                    step=0.01 if asset_info['point_value'] < 10 else 1.0
-                )
+            # Risque %
+            risque_pct = st.slider(
+                "🎯 Risque par Trade (%)",
+                min_value=0.5,
+                max_value=10.0,
+                value=2.0,
+                step=0.5
+            )
+
+            montant_risque_total = capital_total * (risque_pct / 100)
+
+            st.info(f"💰 Montant à risquer : **{montant_risque_total:.2f} €** ({risque_pct}% de {capital_total:.2f}€)")
+
+            # Valeur du point (modifiable)
+            st.markdown("---")
+            st.markdown("#### ⚙️ Configuration")
+
+            point_value = st.number_input(
+                f"Point Value ({asset_info['currency']})",
+                min_value=0.01,
+                value=asset_info['point_value'],
+                step=0.01 if asset_info['point_value'] < 10 else 1.0,
+                help=f"Valeur prédéfinie: {asset_info['point_value']}{asset_info['currency']}"
+            )
 
         with col_right:
-            with st.container(border=True):
-                st.markdown("#### 📊 Results")
+            st.markdown("#### 📊 Résultats")
 
-                if entry_price > 0 and stop_loss > 0 and take_profit > 0 and point_value > 0:
-                    risk_distance = abs(entry_price - stop_loss)
-                    reward_distance = abs(take_profit - entry_price)
+            if entry_price > 0 and stop_loss > 0 and take_profit > 0 and point_value > 0:
+                # Calculs
+                risk_distance = abs(entry_price - stop_loss)
+                reward_distance = abs(take_profit - entry_price)
 
-                    if risk_distance > 0:
-                        position_size_lots = montant_risque_total / (risk_distance * point_value)
-                    else:
-                        position_size_lots = 0
-
-                    perte_max = risk_distance * point_value * position_size_lots
-                    gain_potentiel = reward_distance * point_value * position_size_lots
-                    risk_reward_ratio = reward_distance / risk_distance if risk_distance > 0 else 0
-
-                    metric_col1, metric_col2 = st.columns(2)
-
-                    with metric_col1:
-                        st.metric("📏 Position Size", f"{position_size_lots:.4f} lots")
-
-                    with metric_col2:
-                        st.metric("⚖️ Risk:Reward", f"1:{risk_reward_ratio:.2f}")
-
-                    metric_col3, metric_col4 = st.columns(2)
-
-                    with metric_col3:
-                        st.metric("🔴 Max Loss", f"-{perte_max:.2f} €", delta=f"{risk_distance:.4f} pts")
-
-                    with metric_col4:
-                        st.metric("🟢 Potential Gain", f"+{gain_potentiel:.2f} €", delta=f"{reward_distance:.4f} pts")
-
-                    # Alerts
-                    if risque_pct > 5 or perte_max > capital_reel:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        st.markdown("""
-                        <div class="danger-alert">
-                            <h3 style="color: #ff4444; margin: 0;">🚨 ALERTE RISQUE ÉLEVÉ</h3>
-                            <p style="color: #ffcccc; margin-top: 10px;">Le risque dépasse les limites recommandées</p>
-                        </div>
-                        """, unsafe_allow_html=True)
+                if risk_distance > 0:
+                    position_size_lots = montant_risque_total / (risk_distance * point_value)
                 else:
-                    st.warning("⚠️ Veuillez remplir tous les champs")
+                    position_size_lots = 0
+
+                perte_max = risk_distance * point_value * position_size_lots
+                gain_potentiel = reward_distance * point_value * position_size_lots
+                risk_reward_ratio = reward_distance / risk_distance if risk_distance > 0 else 0
+
+                # Affichage des métriques
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-label">Position Size</div>
+                    <div class="metric-value">{position_size_lots:.4f} lots</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                metric_col1, metric_col2 = st.columns(2)
+
+                with metric_col1:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">Max Loss</div>
+                        <div class="metric-value" style="color: #ff4444;">-{perte_max:.2f} €</div>
+                        <small style="color: #8b92a7;">{risk_distance:.4f} points</small>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                with metric_col2:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">Potential Gain</div>
+                        <div class="metric-value" style="color: #00ff88;">+{gain_potentiel:.2f} €</div>
+                        <small style="color: #8b92a7;">{reward_distance:.4f} points</small>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-label">Risk:Reward Ratio</div>
+                    <div class="metric-value" style="color: {'#00ff88' if risk_reward_ratio >= 2 else '#ffaa00'};">1:{risk_reward_ratio:.2f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Alerte risque élevé
+                if risque_pct > 5 or perte_max > capital_reel:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    alert_messages = []
+                    if risque_pct > 5:
+                        alert_messages.append(f"⚠️ Risque de {risque_pct}% dépasse 5%")
+                    if perte_max > capital_reel:
+                        alert_messages.append(f"⚠️ Perte potentielle entamera le crédit broker")
+
+                    st.markdown(f"""
+                    <div class="danger-alert">
+                        <h3 style="color: #ff4444; margin: 0;">🚨 ALERTE RISQUE ÉLEVÉ</h3>
+                        <p style="color: #ffcccc; margin-top: 10px;">{'<br>'.join(alert_messages)}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                # Détails du calcul
+                with st.expander("📋 Détails du Calcul"):
+                    st.markdown(f"""
+                    **Formule:**
+                    ```
+                    Position Size = Capital à Risquer / (Distance SL × Valeur Point)
+                    Position Size = {montant_risque_total:.2f} / ({risk_distance:.4f} × {point_value})
+                    Position Size = {position_size_lots:.4f} lots
+                    ```
+
+                    **Paramètres:**
+                    - Capital Total: {capital_total:.2f} €
+                    - Risque: {risque_pct}% = {montant_risque_total:.2f} €
+                    - Distance SL: {risk_distance:.4f} points
+                    - Distance TP: {reward_distance:.4f} points
+                    - Valeur Point: {point_value} {asset_info['currency']}
+
+                    **P&L:**
+                    - Perte Max = {perte_max:.2f} €
+                    - Gain Potentiel = {gain_potentiel:.2f} €
+                    - Ratio R:R = 1:{risk_reward_ratio:.2f}
+                    """)
+            else:
+                st.warning("⚠️ Veuillez remplir tous les champs")
 
     # ============================================
-    # JOURNAL PAGE
+    # TAB 3: JOURNAL
     # ============================================
-    elif page == "📔 Journal":
-        st.markdown("### 📔 Trade Journal")
+    with tab3:
+        st.markdown("### 📖 Journal de Trading")
 
         trades_df = get_user_trades(st.session_state.user_email)
 
+        # Afficher le tableau si des trades existent
         if not trades_df.empty:
-            with st.container(border=True):
-                display_df = trades_df[['date', 'pair', 'direction', 'entry_price', 'exit_price', 'lots', 'result']].copy()
-                display_df['result'] = display_df['result'].apply(lambda x: f"{'+' if x > 0 else ''}{x:.2f} €")
-                display_df.columns = ['Date', 'Asset', 'Direction', 'Entry', 'Exit', 'Lots', 'P&L']
+            st.markdown("#### 📜 Historique des Trades")
 
-                st.dataframe(display_df, use_container_width=True, height=400, hide_index=True)
+            display_df = trades_df[['date', 'pair', 'direction', 'entry_price', 'exit_price', 'lots', 'result']].copy()
+            display_df['result'] = display_df['result'].apply(lambda x: f"{'+' if x > 0 else ''}{x:.2f} €")
+            display_df.columns = ['Date', 'Asset', 'Direction', 'Entry', 'Exit', 'Lots', 'P&L']
 
-                col_action1, col_action2 = st.columns(2)
-                with col_action1:
-                    if st.button("🗑️ Clear All Trades", use_container_width=True):
-                        if delete_user_trades(st.session_state.user_email):
-                            st.success("✅ Trades supprimés")
-                            st.rerun()
+            st.dataframe(display_df, use_container_width=True, height=400, hide_index=True)
 
-                with col_action2:
-                    csv = display_df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        "📥 Export CSV",
-                        data=csv,
-                        file_name=f"trades_{datetime.now().strftime('%Y%m%d')}.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
+            # Actions
+            col_action1, col_action2 = st.columns(2)
+
+            with col_action1:
+                if st.button("🗑️ Clear All Trades", use_container_width=True):
+                    if delete_user_trades(st.session_state.user_email):
+                        st.success("✅ Tous les trades supprimés")
+                        st.rerun()
+
+            with col_action2:
+                csv = display_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    "📥 Export CSV",
+                    data=csv,
+                    file_name=f"trades_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
         else:
-            st.info("📭 Aucun trade enregistré")
+            st.info("📭 Aucun trade enregistré. Ajoutez votre premier trade ci-dessous!")
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        with st.expander("➕ Nouveau Trade", expanded=False):
+        # Formulaire d'ajout de trade
+        with st.expander("➕ Ajouter un Trade", expanded=True):
             with st.form("trade_form", clear_on_submit=True):
                 col1, col2 = st.columns(2)
 
@@ -761,14 +740,16 @@ def show_main_app():
                     trade_date = st.date_input("Date", datetime.now())
                     trade_pair = st.selectbox("Asset", list(ASSET_CONFIG.keys()))
                     trade_direction = st.radio("Direction", ["Long", "Short"], horizontal=True)
-                    trade_entry = st.number_input("Entry Price", min_value=0.0, step=0.01)
+                    trade_entry = st.number_input("Entry Price", min_value=0.0, step=0.01, format="%.4f")
 
                 with col2:
+                    trade_exit = st.number_input("Exit Price", min_value=0.0, step=0.01, format="%.4f")
                     trade_lots = st.number_input("Lots", min_value=0.0001, value=0.01, step=0.01, format="%.4f")
-                    trade_exit = st.number_input("Exit Price", min_value=0.0, step=0.01)
-                    trade_result = st.number_input("P&L (€)", step=10.0)
+                    trade_result = st.number_input("P&L (€)", step=10.0, help="Résultat net du trade")
 
-                if st.form_submit_button("✅ Add Trade", use_container_width=True):
+                submitted = st.form_submit_button("✅ Ajouter le Trade", use_container_width=True)
+
+                if submitted:
                     if add_trade(
                         st.session_state.user_email,
                         trade_date.strftime("%Y-%m-%d"),
@@ -779,108 +760,122 @@ def show_main_app():
                         trade_lots,
                         trade_result
                     ):
-                        st.success("✅ Trade ajouté!")
+                        st.success("✅ Trade ajouté avec succès!")
                         st.rerun()
 
     # ============================================
-    # ANALYTICS PAGE
+    # TAB 4: ANALYTICS
     # ============================================
-    elif page == "📊 Analytics":
-        st.markdown("### 📊 Performance Analytics")
+    with tab4:
+        st.markdown("### 📊 Analytics & Performance")
 
         trades_df = get_user_trades(st.session_state.user_email)
 
         if not trades_df.empty:
             kpis = calculate_kpis(trades_df)
 
-            with st.container(border=True):
-                st.markdown("#### 📈 Key Performance Indicators")
+            # KPIs
+            st.markdown("#### 📈 Statistiques Clés")
 
-                kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+            kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
-                with kpi_col1:
-                    st.metric("🎯 Winrate", f"{kpis['winrate']:.1f}%", f"{kpis['total_trades']} trades")
+            with kpi_col1:
+                st.metric("🎯 Winrate", f"{kpis['winrate']:.1f}%", f"{kpis['total_trades']} trades")
 
-                with kpi_col2:
-                    st.metric("💰 Profit Factor", f"{kpis['profit_factor']:.2f}")
+            with kpi_col2:
+                st.metric("💰 Profit Factor", f"{kpis['profit_factor']:.2f}")
 
-                with kpi_col3:
-                    st.metric("🟢 Biggest Win", f"+{kpis['biggest_win']:.2f} €")
+            with kpi_col3:
+                st.metric("🟢 Biggest Win", f"+{kpis['biggest_win']:.2f} €")
 
-                with kpi_col4:
-                    st.metric("🔴 Biggest Loss", f"{kpis['biggest_loss']:.2f} €")
+            with kpi_col4:
+                st.metric("🔴 Biggest Loss", f"{kpis['biggest_loss']:.2f} €")
 
             st.markdown("<br>", unsafe_allow_html=True)
 
+            # Graphiques
             chart_col1, chart_col2 = st.columns(2)
 
             with chart_col1:
-                with st.container(border=True):
-                    st.markdown("#### 📈 Equity Curve")
+                st.markdown("#### 📈 Equity Curve")
 
-                    trades_df_sorted = trades_df.sort_values('date')
-                    trades_df_sorted['cumulative'] = trades_df_sorted['result'].cumsum() + capital_reel
+                trades_df_sorted = trades_df.sort_values('date')
+                trades_df_sorted['cumulative'] = trades_df_sorted['result'].cumsum() + st.session_state.capital_reel
 
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(
-                        x=trades_df_sorted['date'],
-                        y=trades_df_sorted['cumulative'],
-                        mode='lines+markers',
-                        line=dict(color='#00c9ff', width=3),
-                        fill='tozeroy',
-                        fillcolor='rgba(0, 201, 255, 0.1)'
-                    ))
+                fig_equity = go.Figure()
+                fig_equity.add_trace(go.Scatter(
+                    x=trades_df_sorted['date'],
+                    y=trades_df_sorted['cumulative'],
+                    mode='lines+markers',
+                    name='Equity',
+                    line=dict(color='#00c9ff', width=3),
+                    marker=dict(size=8, color='#00c9ff'),
+                    fill='tozeroy',
+                    fillcolor='rgba(0, 201, 255, 0.1)'
+                ))
 
-                    fig.update_layout(
-                        template="plotly_dark",
-                        plot_bgcolor='#0e1117',
-                        paper_bgcolor='#0e1117',
-                        height=350
-                    )
+                fig_equity.add_hline(
+                    y=st.session_state.capital_reel,
+                    line_dash="dash",
+                    line_color="white",
+                    opacity=0.5
+                )
 
-                    st.plotly_chart(fig, use_container_width=True)
+                fig_equity.update_layout(
+                    template="plotly_dark",
+                    plot_bgcolor='#0e1117',
+                    paper_bgcolor='#0e1117',
+                    height=400,
+                    xaxis_title="Date",
+                    yaxis_title="Capital (€)",
+                    hovermode='x unified'
+                )
+
+                st.plotly_chart(fig_equity, use_container_width=True)
 
             with chart_col2:
-                with st.container(border=True):
-                    st.markdown("#### 📊 Win/Loss Distribution")
+                st.markdown("#### 📊 Win/Loss Distribution")
 
-                    winning_count = len(trades_df[trades_df['result'] > 0])
-                    losing_count = len(trades_df[trades_df['result'] < 0])
+                winning_count = len(trades_df[trades_df['result'] > 0])
+                losing_count = len(trades_df[trades_df['result'] < 0])
 
-                    fig = go.Figure(data=[go.Pie(
-                        labels=['Wins', 'Losses'],
-                        values=[winning_count, losing_count],
-                        marker=dict(colors=['#00c9ff', '#ff4444']),
-                        hole=0.5
-                    )])
+                fig_pie = go.Figure(data=[go.Pie(
+                    labels=['Wins', 'Losses'],
+                    values=[winning_count, losing_count],
+                    marker=dict(colors=['#00c9ff', '#ff4444']),
+                    hole=0.5,
+                    textinfo='label+percent',
+                    textfont=dict(size=14, color='white')
+                )])
 
-                    fig.update_layout(
-                        template="plotly_dark",
-                        plot_bgcolor='#0e1117',
-                        paper_bgcolor='#0e1117',
-                        height=350
-                    )
+                fig_pie.update_layout(
+                    template="plotly_dark",
+                    plot_bgcolor='#0e1117',
+                    paper_bgcolor='#0e1117',
+                    height=400
+                )
 
-                    st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig_pie, use_container_width=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            with st.container(border=True):
-                st.markdown("#### 💵 P&L Statistics")
+            # Stats détaillées
+            st.markdown("#### 💵 Statistiques P&L")
 
-                stats_col1, stats_col2, stats_col3 = st.columns(3)
+            stats_col1, stats_col2, stats_col3 = st.columns(3)
 
-                with stats_col1:
-                    total_pnl = trades_df['result'].sum()
-                    st.metric("Total P&L", f"{total_pnl:+.2f} €")
+            with stats_col1:
+                total_pnl = trades_df['result'].sum()
+                st.metric("Total P&L", f"{total_pnl:+.2f} €")
 
-                with stats_col2:
-                    st.metric("Average Win", f"+{kpis['avg_win']:.2f} €")
+            with stats_col2:
+                st.metric("Average Win", f"+{kpis['avg_win']:.2f} €")
 
-                with stats_col3:
-                    st.metric("Average Loss", f"{kpis['avg_loss']:.2f} €")
+            with stats_col3:
+                st.metric("Average Loss", f"{kpis['avg_loss']:.2f} €")
+
         else:
-            st.info("📭 Aucune donnée disponible")
+            st.info("📭 Aucune donnée disponible. Ajoutez des trades dans le Journal!")
 
 # ============================================
 # ROUTING
