@@ -1,0 +1,22 @@
+═══════════════════════════════════════════════════════════════════
+COMMANDES À EXÉCUTER APRÈS AVOIR CRÉÉ LE REPO SUR GITHUB.COM
+═══════════════════════════════════════════════════════════════════
+
+⚠️  IMPORTANT : Remplacez VOTRE-USERNAME par votre vrai nom GitHub !
+
+Exemple : Si vous êtes "aminetrade", utilisez :
+git remote add origin https://github.com/aminetrade/trading-pro-platform.git
+
+═══════════════════════════════════════════════════════════════════
+
+COMMANDES (à exécuter dans le terminal) :
+
+cd ~/trading-pro-platform
+
+git remote add origin https://github.com/VOTRE-USERNAME/trading-pro-platform.git
+
+git branch -M main
+
+git push -u origin main
+
+═══════════════════════════════════════════════════════════════════
