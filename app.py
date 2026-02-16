@@ -5,6 +5,7 @@ from datetime import datetime
 from supabase import create_client, Client
 import bcrypt
 import os
+import extra_streamlit_components as stx
 
 # Configuration de la page
 st.set_page_config(
@@ -13,6 +14,11 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# ============================================
+# COOKIE MANAGER
+# ============================================
+cookie_manager = stx.CookieManager()
 
 # ============================================
 # CSS ULTRA-PRO FINTECH DARK MODE
@@ -250,6 +256,16 @@ def authenticate_user(email: str, password: str):
         st.error(f"❌ Erreur: {str(e)}")
         return None
 
+def get_user_by_email(email: str):
+    """Récupère un utilisateur par email (pour auto-login via cookie)"""
+    try:
+        response = supabase.table('users').select("*").eq('email', email).execute()
+        if response.data:
+            return response.data[0]
+        return None
+    except:
+        return None
+
 def check_table_exists(table_name: str):
     try:
         supabase.table(table_name).select("id").limit(1).execute()
@@ -330,6 +346,22 @@ if 'credit_broker' not in st.session_state:
     st.session_state.credit_broker = 500.0
 
 # ============================================
+# AUTO-LOGIN VIA COOKIE
+# ============================================
+if not st.session_state.authenticated:
+    # Récupérer le cookie
+    user_email_cookie = cookie_manager.get(cookie="user_email")
+    user_name_cookie = cookie_manager.get(cookie="user_name")
+
+    if user_email_cookie:
+        # Vérifier que l'utilisateur existe toujours dans la DB
+        user = get_user_by_email(user_email_cookie)
+        if user:
+            st.session_state.authenticated = True
+            st.session_state.user_email = user_email_cookie
+            st.session_state.user_name = user_name_cookie if user_name_cookie else user.get('full_name', user_email_cookie.split('@')[0])
+
+# ============================================
 # PAGE DE LOGIN
 # ============================================
 def show_login_page():
@@ -351,6 +383,7 @@ def show_login_page():
         with st.form("login_form"):
             email = st.text_input("Email", placeholder="votre@email.com")
             password = st.text_input("Mot de passe", type="password", placeholder="••••••••")
+            remember_me = st.checkbox("Se souvenir de moi (30 jours)", value=True)
             submit = st.form_submit_button("Se connecter", use_container_width=True)
 
             if submit:
@@ -360,6 +393,12 @@ def show_login_page():
                         st.session_state.authenticated = True
                         st.session_state.user_email = user['email']
                         st.session_state.user_name = user.get('full_name', email.split('@')[0])
+
+                        # Créer le cookie si "Se souvenir de moi" est coché
+                        if remember_me:
+                            cookie_manager.set(cookie="user_email", val=user['email'], expires_at=datetime.now() + pd.Timedelta(days=30))
+                            cookie_manager.set(cookie="user_name", val=st.session_state.user_name, expires_at=datetime.now() + pd.Timedelta(days=30))
+
                         st.success("✅ Connexion réussie!")
                         st.rerun()
                     else:
@@ -393,21 +432,26 @@ def show_login_page():
 # MAIN APP
 # ============================================
 def show_main_app():
-    # Header avec logo et déconnexion
-    col_logo, col_title, col_logout = st.columns([1, 3, 1])
+    # Header avec logo centré et déconnexion
+    col_left, col_center, col_right = st.columns([1, 2, 1])
 
-    with col_logo:
+    with col_left:
+        st.markdown(f'<p style="color: #8b92a7; margin-top: 20px;">👤 {st.session_state.user_name}</p>', unsafe_allow_html=True)
+
+    with col_center:
+        # Logo centré
         try:
-            st.image("logo1.png", width=150)
+            st.image("logo1.png", width=350)
         except:
-            st.markdown("## 🌊 TradeFlow")
+            st.markdown('<h1 style="color: #00c9ff; text-align: center;">🌊 TradeFlow</h1>', unsafe_allow_html=True)
 
-    with col_title:
-        st.markdown(f'<h1 style="color: #00c9ff; text-align: center;">TradeFlow Premium</h1>', unsafe_allow_html=True)
-        st.markdown(f'<p style="text-align: center; color: #8b92a7;">👤 {st.session_state.user_name} | {st.session_state.user_email}</p>', unsafe_allow_html=True)
-
-    with col_logout:
+    with col_right:
         if st.button("🚪 Déconnexion", use_container_width=True):
+            # Supprimer les cookies
+            cookie_manager.delete(cookie="user_email")
+            cookie_manager.delete(cookie="user_name")
+
+            # Réinitialiser la session
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.session_state.user_name = None
