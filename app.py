@@ -19,10 +19,9 @@ st.set_page_config(
 )
 
 # ============================================
-# COOKIE MANAGER - INITIALISATION
+# COOKIE MANAGER - UNE SEULE INITIALISATION GLOBALE
 # ============================================
-cookie_manager = stx.CookieManager(key="tradeflow_auth")
-time.sleep(0.1)
+cookie_manager = stx.CookieManager(key="main_auth_manager")
 
 # ============================================
 # CSS ULTRA-PRO FINTECH DARK MODE
@@ -244,12 +243,11 @@ if 'credit_broker' not in st.session_state:
     st.session_state.credit_broker = 500.0
 
 # ============================================
-# LOGIQUE DE DÉMARRAGE - AUTO-LOGIN VIA COOKIE
+# VÉRIFICATION AU DÉMARRAGE - AUTO-LOGIN
 # ============================================
-auth_cookie = cookie_manager.get(cookie="logged_in")
-if auth_cookie == "true" and not st.session_state.authenticated:
-    # Récupérer l'email depuis le cookie
-    saved_email = cookie_manager.get(cookie="user_email")
+cookie_val = cookie_manager.get("logged_in")
+if cookie_val == "true" and not st.session_state.authenticated:
+    saved_email = cookie_manager.get("user_email")
     if saved_email:
         try:
             response = supabase.table('users').select("*").eq('email', saved_email).execute()
@@ -291,8 +289,8 @@ if not st.session_state.authenticated:
             if submit and email and password:
                 user = authenticate_user(email, password)
                 if user:
-                    # 1. Écrire les cookies
                     if remember:
+                        # 1. Écrire les cookies
                         cookie_manager.set("logged_in", "true", expires_at=datetime.now() + timedelta(days=30))
                         cookie_manager.set("user_email", user['email'], expires_at=datetime.now() + timedelta(days=30))
 
@@ -302,7 +300,7 @@ if not st.session_state.authenticated:
                     st.session_state.user_name = user.get('full_name', email.split('@')[0])
 
                     # 3. Attendre que le cookie s'écrive
-                    time.sleep(1)
+                    time.sleep(0.5)
 
                     # 4. Rerun
                     st.rerun()
@@ -345,16 +343,11 @@ with col2:
 
 with col3:
     if st.button("🚪 Déconnexion"):
-        # Supprimer les cookies
         cookie_manager.delete("logged_in")
         cookie_manager.delete("user_email")
-
-        # Réinitialiser session_state
         st.session_state.authenticated = False
         st.session_state.user_email = None
         st.session_state.user_name = None
-
-        # Rerun
         st.rerun()
 
 st.markdown("---")
