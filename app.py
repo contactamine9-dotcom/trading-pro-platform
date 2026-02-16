@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 from supabase import create_client, Client
 import bcrypt
 import os
 import time
+import extra_streamlit_components as stx
 
 # ============================================
 # CONFIGURATION DE LA PAGE (EN PREMIER)
@@ -18,13 +19,10 @@ st.set_page_config(
 )
 
 # ============================================
-# COOKIE MANAGER - INITIALISATION AVEC CLÉ
+# COOKIE MANAGER - INITIALISATION
 # ============================================
-try:
-    import extra_streamlit_components as stx
-    cookie_manager = stx.CookieManager(key="tradeflow_cookies")
-except Exception:
-    cookie_manager = None
+cookie_manager = stx.CookieManager(key="tradeflow_auth")
+time.sleep(0.1)
 
 # ============================================
 # CSS ULTRA-PRO FINTECH DARK MODE
@@ -246,20 +244,22 @@ if 'credit_broker' not in st.session_state:
     st.session_state.credit_broker = 500.0
 
 # ============================================
-# AUTO-LOGIN VIA COOKIE (AU DÉBUT DU SCRIPT)
+# LOGIQUE DE DÉMARRAGE - AUTO-LOGIN VIA COOKIE
 # ============================================
-if cookie_manager and not st.session_state.authenticated:
-    try:
-        saved_email = cookie_manager.get("tradeflow_user_email")
-        if saved_email:
+auth_cookie = cookie_manager.get(cookie="logged_in")
+if auth_cookie == "true" and not st.session_state.authenticated:
+    # Récupérer l'email depuis le cookie
+    saved_email = cookie_manager.get(cookie="user_email")
+    if saved_email:
+        try:
             response = supabase.table('users').select("*").eq('email', saved_email).execute()
             if response.data:
                 user = response.data[0]
                 st.session_state.authenticated = True
                 st.session_state.user_email = user['email']
                 st.session_state.user_name = user.get('full_name', user['email'].split('@')[0])
-    except:
-        pass
+        except:
+            pass
 
 # ============================================
 # PAGE DE LOGIN
@@ -291,20 +291,18 @@ if not st.session_state.authenticated:
             if submit and email and password:
                 user = authenticate_user(email, password)
                 if user:
-                    # 1. Écrire le cookie
-                    if remember and cookie_manager:
-                        try:
-                            cookie_manager.set("tradeflow_user_email", user['email'], expires_at=datetime(2025, 12, 31))
-                        except:
-                            pass
+                    # 1. Écrire les cookies
+                    if remember:
+                        cookie_manager.set("logged_in", "true", expires_at=datetime.now() + timedelta(days=30))
+                        cookie_manager.set("user_email", user['email'], expires_at=datetime.now() + timedelta(days=30))
 
-                    # 2. Attendre 1 seconde
-                    time.sleep(1)
-
-                    # 3. Forcer session_state
+                    # 2. Forcer session_state
                     st.session_state.authenticated = True
                     st.session_state.user_email = user['email']
                     st.session_state.user_name = user.get('full_name', email.split('@')[0])
+
+                    # 3. Attendre que le cookie s'écrive
+                    time.sleep(1)
 
                     # 4. Rerun
                     st.rerun()
@@ -347,16 +345,16 @@ with col2:
 
 with col3:
     if st.button("🚪 Déconnexion"):
+        # Supprimer les cookies
+        cookie_manager.delete("logged_in")
+        cookie_manager.delete("user_email")
+
+        # Réinitialiser session_state
         st.session_state.authenticated = False
         st.session_state.user_email = None
         st.session_state.user_name = None
 
-        if cookie_manager:
-            try:
-                cookie_manager.delete("tradeflow_user_email")
-            except:
-                pass
-
+        # Rerun
         st.rerun()
 
 st.markdown("---")
@@ -562,7 +560,6 @@ with tab3:
 
         if submitted:
             if trade_entry > 0 and trade_exit > 0:
-                # 1. Envoyer à Supabase
                 try:
                     response = supabase.table('trades').insert({
                         "user_email": st.session_state.user_email,
@@ -576,7 +573,6 @@ with tab3:
                         "timestamp": datetime.now().isoformat()
                     }).execute()
 
-                    # 2. Vérifier si response.data existe
                     if response.data:
                         st.success("✅ Trade sauvegardé !")
                         time.sleep(1)
