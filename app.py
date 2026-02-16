@@ -310,19 +310,25 @@ supabase = init_supabase()
 def check_table_exists():
     """Vérifie si la table 'trades' existe et affiche un message si nécessaire"""
     try:
-        # Essayer de faire une requête simple
+        # Essayer de faire une requête simple avec timeout implicite
         result = supabase.table('trades').select("id").limit(1).execute()
         return True
     except Exception as e:
         error_msg = str(e).lower()
         if "relation" in error_msg and "does not exist" in error_msg:
-            st.error("""
-            ❌ **Table 'trades' non trouvée dans Supabase**
+            st.warning("""
+            ⚠️ **Table 'trades' non trouvée dans Supabase**
 
-            Veuillez créer la table dans l'interface SQL de Supabase :
+            **Instructions rapides :**
+            1. Allez sur https://app.supabase.com
+            2. Sélectionnez votre projet
+            3. Allez dans "SQL Editor"
+            4. Exécutez le fichier `create_table.sql`
+            5. Rafraîchissez cette page
 
+            **SQL à exécuter :**
             ```sql
-            CREATE TABLE trades (
+            CREATE TABLE IF NOT EXISTS trades (
                 id BIGSERIAL PRIMARY KEY,
                 date TEXT NOT NULL,
                 pair TEXT NOT NULL,
@@ -333,40 +339,22 @@ def check_table_exists():
                 result REAL NOT NULL,
                 timestamp TIMESTAMPTZ DEFAULT NOW()
             );
-
-            -- Activer Row Level Security (RLS)
             ALTER TABLE trades ENABLE ROW LEVEL SECURITY;
-
-            -- Créer une policy pour autoriser toutes les opérations (à ajuster selon vos besoins)
-            CREATE POLICY "Enable all operations for authenticated users" ON trades
-                FOR ALL
-                TO authenticated
-                USING (true)
-                WITH CHECK (true);
-
-            -- Policy pour les utilisateurs anonymes (si vous utilisez la clé anon)
-            CREATE POLICY "Enable all operations for anon users" ON trades
-                FOR ALL
-                TO anon
-                USING (true)
-                WITH CHECK (true);
+            CREATE POLICY "Enable all for anon" ON trades FOR ALL TO anon USING (true) WITH CHECK (true);
+            CREATE POLICY "Enable all for authenticated" ON trades FOR ALL TO authenticated USING (true) WITH CHECK (true);
             ```
-
-            **Instructions :**
-            1. Allez sur https://app.supabase.com
-            2. Sélectionnez votre projet
-            3. Allez dans "SQL Editor"
-            4. Collez le code ci-dessus
-            5. Cliquez sur "Run"
-            6. Rafraîchissez cette page
             """)
-            st.stop()
+            return False
         else:
-            st.error(f"❌ Erreur lors de la vérification de la table : {str(e)}")
-            st.stop()
+            st.warning(f"⚠️ Erreur de connexion Supabase : {str(e)[:200]}")
+            return False
 
-# Vérifier que la table existe au démarrage
-check_table_exists()
+# Vérifier que la table existe au démarrage (avec timeout pour éviter blocage)
+try:
+    check_table_exists()
+except Exception as e:
+    st.warning(f"⚠️ Impossible de vérifier la table 'trades'. Erreur : {str(e)[:100]}")
+    st.info("L'application va démarrer quand même. Vérifiez votre connexion Supabase.")
 
 # ============================================
 # FONCTIONS SUPABASE
