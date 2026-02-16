@@ -5,6 +5,7 @@ from datetime import datetime
 from supabase import create_client, Client
 import bcrypt
 import os
+import time
 
 # ============================================
 # CONFIGURATION DE LA PAGE (EN PREMIER)
@@ -17,11 +18,11 @@ st.set_page_config(
 )
 
 # ============================================
-# COOKIE MANAGER - INITIALISATION ROBUSTE
+# COOKIE MANAGER - INITIALISATION AVEC CLÉ
 # ============================================
 try:
     import extra_streamlit_components as stx
-    cookie_manager = stx.CookieManager()
+    cookie_manager = stx.CookieManager(key="tradeflow_cookies")
 except Exception:
     cookie_manager = None
 
@@ -30,25 +31,21 @@ except Exception:
 # ============================================
 st.markdown("""
     <style>
-    /* Cacher tous les éléments Streamlit pour un look application native */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .stDeployButton {display: none;}
 
-    /* Theme Fintech Dark Mode */
     .stApp {
         background-color: #0e1117;
         color: #fafafa;
     }
 
-    /* Logo non-cliquable (pas de zoom) */
     [data-testid="stImage"] img {
         pointer-events: none !important;
         cursor: default !important;
     }
 
-    /* Inputs et boutons arrondis */
     .stTextInput > div > div > input,
     .stNumberInput > div > div > input,
     .stSelectbox > div > div > div,
@@ -74,7 +71,6 @@ st.markdown("""
         box-shadow: 0 8px 24px rgba(0, 201, 255, 0.4) !important;
     }
 
-    /* Métriques stylisées */
     [data-testid="stMetricValue"] {
         font-size: 28px !important;
         font-weight: 700 !important;
@@ -88,7 +84,6 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* Tabs modernes */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background-color: transparent;
@@ -108,13 +103,11 @@ st.markdown("""
         font-weight: 700;
     }
 
-    /* Dataframe stylé */
     [data-testid="stDataFrame"] {
         border-radius: 8px;
         border: 1px solid #2d3142;
     }
 
-    /* Forms */
     [data-testid="stForm"] {
         background-color: #1a1d29;
         border-radius: 12px;
@@ -122,32 +115,23 @@ st.markdown("""
         border: 1px solid #2d3142;
     }
 
-    /* Alerts */
     .stAlert {
         border-radius: 8px;
         border-left: 4px solid #00c9ff;
     }
 
-    /* Login Page Styling */
     .login-container {
         max-width: 450px;
         margin: 0 auto;
         padding: 40px 20px;
     }
 
-    .login-header {
-        text-align: center;
-        margin-bottom: 40px;
-    }
-
-    /* Container boxes */
     div[data-testid="stHorizontalBlock"] {
         gap: 16px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Configuration des actifs
 ASSET_CONFIG = {
     "XAUUSD": {"name": "Gold", "point_value": 100.0, "currency": "$"},
     "DJ30": {"name": "Dow Jones 30", "point_value": 5.0, "currency": "$"},
@@ -206,25 +190,6 @@ def create_user(email: str, password: str, full_name: str = None):
 # ============================================
 # FONCTIONS TRADES
 # ============================================
-def add_trade(user_email, date, pair, direction, entry_price, exit_price, lots, result):
-    try:
-        data = {
-            "user_email": user_email,
-            "date": date,
-            "pair": pair,
-            "direction": direction,
-            "entry_price": entry_price,
-            "exit_price": exit_price,
-            "lots": lots,
-            "result": result,
-            "timestamp": datetime.now().isoformat()
-        }
-        supabase.table('trades').insert(data).execute()
-        return True
-    except Exception as e:
-        st.error(f"❌ Erreur: {str(e)}")
-        return False
-
 def get_user_trades(user_email):
     try:
         response = supabase.table('trades').select("*").eq('user_email', user_email).order('date', desc=True).execute()
@@ -267,7 +232,7 @@ def calculate_kpis(trades_df):
     }
 
 # ============================================
-# SESSION STATE & COOKIE AUTO-LOGIN
+# SESSION STATE
 # ============================================
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
@@ -280,7 +245,9 @@ if 'capital_reel' not in st.session_state:
 if 'credit_broker' not in st.session_state:
     st.session_state.credit_broker = 500.0
 
-# Auto-login via cookie
+# ============================================
+# AUTO-LOGIN VIA COOKIE (AU DÉBUT DU SCRIPT)
+# ============================================
 if cookie_manager and not st.session_state.authenticated:
     try:
         saved_email = cookie_manager.get("tradeflow_user_email")
@@ -298,7 +265,6 @@ if cookie_manager and not st.session_state.authenticated:
 # PAGE DE LOGIN
 # ============================================
 if not st.session_state.authenticated:
-    # Header centré avec logo
     st.markdown('<div class="login-container">', unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -325,17 +291,22 @@ if not st.session_state.authenticated:
             if submit and email and password:
                 user = authenticate_user(email, password)
                 if user:
-                    st.session_state.authenticated = True
-                    st.session_state.user_email = user['email']
-                    st.session_state.user_name = user.get('full_name', email.split('@')[0])
-
-                    # Sauvegarder dans cookie si demandé
+                    # 1. Écrire le cookie
                     if remember and cookie_manager:
                         try:
                             cookie_manager.set("tradeflow_user_email", user['email'], expires_at=datetime(2025, 12, 31))
                         except:
                             pass
 
+                    # 2. Attendre 1 seconde
+                    time.sleep(1)
+
+                    # 3. Forcer session_state
+                    st.session_state.authenticated = True
+                    st.session_state.user_email = user['email']
+                    st.session_state.user_name = user.get('full_name', email.split('@')[0])
+
+                    # 4. Rerun
                     st.rerun()
                 else:
                     st.error("❌ Email ou mot de passe incorrect")
@@ -363,7 +334,6 @@ if not st.session_state.authenticated:
 # APPLICATION PRINCIPALE
 # ============================================
 
-# Header avec logo centré
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col1:
@@ -381,7 +351,6 @@ with col3:
         st.session_state.user_email = None
         st.session_state.user_name = None
 
-        # Supprimer le cookie
         if cookie_manager:
             try:
                 cookie_manager.delete("tradeflow_user_email")
@@ -392,7 +361,6 @@ with col3:
 
 st.markdown("---")
 
-# Calcul du capital total
 capital_total = st.session_state.capital_reel + st.session_state.credit_broker
 
 # ============================================
@@ -406,7 +374,6 @@ tab1, tab2, tab3, tab4 = st.tabs(["🏠 Dashboard", "⚡ Position", "📖 Journa
 with tab1:
     st.markdown("### 💎 Votre Capital")
 
-    # Inputs de capital en haut
     col_input1, col_input2 = st.columns(2)
     with col_input1:
         capital_reel = st.number_input(
@@ -432,7 +399,6 @@ with tab1:
 
     st.markdown("---")
 
-    # 3 métriques sur une ligne
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("💰 Capital Réel", f"{capital_reel:.2f} €")
@@ -443,7 +409,6 @@ with tab1:
 
     st.markdown("---")
 
-    # Performance
     trades_df = get_user_trades(st.session_state.user_email)
 
     if not trades_df.empty:
@@ -462,7 +427,6 @@ with tab1:
         with col4:
             st.metric("📊 Total Trades", f"{kpis['total_trades']}")
 
-        # Equity Curve
         st.markdown("### 📈 Equity Curve")
         trades_df_sorted = trades_df.sort_values('date')
         trades_df_sorted['cumulative'] = trades_df_sorted['result'].cumsum() + capital_reel
@@ -553,10 +517,8 @@ with tab2:
 with tab3:
     st.markdown("### 📖 Journal de Trading")
 
-    # Récupérer les trades
     trades_df = get_user_trades(st.session_state.user_email)
 
-    # Afficher le tableau
     if not trades_df.empty:
         st.markdown("#### 📜 Historique des Trades")
 
@@ -566,7 +528,6 @@ with tab3:
 
         st.dataframe(display_df, use_container_width=True, height=400, hide_index=True)
 
-        # Actions
         col1, col2 = st.columns(2)
         with col1:
             if st.button("🗑️ Supprimer tous les trades"):
@@ -581,7 +542,6 @@ with tab3:
 
     st.markdown("---")
 
-    # Formulaire d'ajout
     st.markdown("#### ➕ Ajouter un Trade")
 
     with st.form("add_trade_form", clear_on_submit=True):
@@ -602,19 +562,29 @@ with tab3:
 
         if submitted:
             if trade_entry > 0 and trade_exit > 0:
-                success = add_trade(
-                    st.session_state.user_email,
-                    trade_date.strftime("%Y-%m-%d"),
-                    trade_pair,
-                    trade_direction,
-                    trade_entry,
-                    trade_exit,
-                    trade_lots,
-                    trade_result
-                )
-                if success:
-                    st.success("✅ Trade ajouté avec succès !")
-                    # PAS de st.rerun() - garde l'utilisateur sur le Journal
+                # 1. Envoyer à Supabase
+                try:
+                    response = supabase.table('trades').insert({
+                        "user_email": st.session_state.user_email,
+                        "date": trade_date.strftime("%Y-%m-%d"),
+                        "pair": trade_pair,
+                        "direction": trade_direction,
+                        "entry_price": trade_entry,
+                        "exit_price": trade_exit,
+                        "lots": trade_lots,
+                        "result": trade_result,
+                        "timestamp": datetime.now().isoformat()
+                    }).execute()
+
+                    # 2. Vérifier si response.data existe
+                    if response.data:
+                        st.success("✅ Trade sauvegardé !")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("❌ Erreur d'enregistrement Supabase")
+                except Exception as e:
+                    st.error(f"❌ Erreur: {str(e)}")
             else:
                 st.error("❌ Veuillez remplir Entry Price et Exit Price")
 
@@ -629,7 +599,6 @@ with tab4:
     if not trades_df.empty:
         kpis = calculate_kpis(trades_df)
 
-        # KPIs détaillés
         st.markdown("#### 🎯 KPIs Détaillés")
 
         col1, col2, col3, col4 = st.columns(4)
@@ -644,7 +613,6 @@ with tab4:
 
         st.markdown("---")
 
-        # Distribution des trades par asset
         st.markdown("#### 🌍 Distribution par Asset")
 
         asset_counts = trades_df['pair'].value_counts()
@@ -667,7 +635,6 @@ with tab4:
 
         st.markdown("---")
 
-        # Performance par direction
         st.markdown("#### 🔄 Performance Long vs Short")
 
         col1, col2 = st.columns(2)
@@ -694,12 +661,10 @@ with tab4:
 
         st.markdown("---")
 
-        # Distribution des gains/pertes
         st.markdown("#### 📊 Distribution des Résultats")
 
         fig_dist = go.Figure()
 
-        # Histogram des P&L
         fig_dist.add_trace(go.Histogram(
             x=trades_df['result'],
             nbinsx=20,
@@ -724,8 +689,5 @@ with tab4:
     else:
         st.info("📭 Aucune donnée pour l'analyse. Ajoutez des trades dans le Journal!")
 
-# ============================================
-# FOOTER
-# ============================================
 st.markdown("---")
 st.markdown("<p style='text-align: center; color: #8b92a7; font-size: 12px;'>🌊 TradeFlow | Professional Trading Intelligence | Powered by Supabase</p>", unsafe_allow_html=True)
